@@ -1,0 +1,40 @@
+; Engine configuration file.
+; 贪吃蛇 2D —— Godot 4.7.2 / GDScript
+
+config_version=5
+
+[application]
+
+config/name="贪吃蛇 2D"
+config/description="基于 Godot 4.7.2 与 GDScript 的霓虹风 2D 贪吃蛇：着色器棋盘、粒子爆发、平滑蛇身、道具与关卡。"
+config/version="0.1.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0.02, 0.035, 0.07, 1)
+boot_splash/show_image=false
+
+[autoload]
+
+SaveData="*res://scripts/save_data.gd"
+Sfx="*res://scripts/sfx.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[gui]
+
+theme/default_font_multichannel_signed_distance_field=true
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.02, 0.035, 0.07, 1)
+anti_aliasing/quality/msaa_2d=2
