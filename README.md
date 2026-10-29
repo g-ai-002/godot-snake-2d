@@ -8,7 +8,10 @@
 - 六种关卡：空旷、边墙、立柱阵、十字回廊、回字迷宫、传送门
 - 五种道具：加速、减速、护盾、磁铁、双倍分，HUD 显示剩余时间
 - 三套配色：霓虹、糖果、经典；三种棋盘（15/20/25）与三档速度
-- 平滑蛇身（Line2D 渐变 + 宽度曲线），吃食物粒子、食物点光源与环绕粒子
+- 着色器棋盘：能量网格、节点闪烁、斜向扫光、内边框辉光与暗角
+- 蛇身着色管效果：圆管明暗、鳞纹、从头到尾流动的能量脉冲与边缘轮廓光
+- 屏幕后处理：泛光、色差、暗角、电影调色、扫描线与胶片颗粒
+- 环境浮尘与虚焦光斑、食物双层光环与环绕卫星、吃食物镜头轻推
 - 开局 3-2-1-GO 倒计时、暂停、结算、新纪录提示、最高分持久化
 - 键盘与触屏滑动操作，自适应窗口尺寸
 
@@ -25,17 +28,21 @@
 
 ## 2D 引擎能力点
 
-| 能力                | 位置                               | 说明                                               |
-| ------------------- | ---------------------------------- | -------------------------------------------------- |
-| CanvasItem 着色器   | `shaders/background.gdshader`      | 全屏流动噪点、中心辉光、暗角与胶片颗粒             |
-| Line2D              | `scripts/snake_view.gd`            | 渐变 + 锥度蛇身、圆角关节；传送时拆成多段折线      |
-| 自定义绘制          | `scripts/board_view.gd`            | 棋盘格、网格、墙体、边框与四角装饰，仅在换色时重绘 |
-| 自定义绘制          | `scripts/food_view.gd`             | 六种食物/道具形状、呼吸光环，全部为矢量绘制        |
-| GPUParticles2D      | `scripts/game.gd` `_burst`         | 吃食物爆发、死亡爆散，颜色随道具变化               |
-| PointLight2D        | `scripts/food_view.gd`             | 食物点光源照亮棋盘；食物自身设为 unshaded 防过曝   |
-| Tween               | `scripts/hud.gd` `scripts/game.gd` | 倒计时弹跳、分数飘字、死亡闪屏                     |
-| Camera2D + 容器锚点 | `scripts/game.gd` `scripts/hud.gd` | 按窗口与棋盘尺寸计算缩放；HUD 全屏自适应           |
-| 运行时音频合成      | `scripts/synth.gd`                 | 用 GDScript 生成 PCM，音效与循环 BGM 零素材依赖    |
+| 能力                | 位置                               | 说明                                                       |
+| ------------------- | ---------------------------------- | ---------------------------------------------------------- |
+| CanvasItem 着色器   | `shaders/background.gdshader`      | 全屏流动噪点、中心辉光、暗角与胶片颗粒                     |
+| CanvasItem 着色器   | `shaders/board2d.gdshader`         | 棋盘格、能量网格、交点闪烁、斜向扫光与内边框辉光           |
+| 屏幕后处理          | `shaders/postfx.gdshader`          | `hint_screen_texture` 采样：泛光、色差、调色、扫描线、颗粒 |
+| Line2D + 着色器     | `shaders/snake_body.gdshader`      | 沿长度流动的能量脉冲、管状明暗、鳞纹与边缘轮廓光           |
+| Line2D + 加法混合   | `shaders/snake_glow.gdshader`      | 蛇身外辉光，配合全屏泛光形成霓虹灯管                       |
+| 自定义绘制          | `scripts/board_view.gd`            | 圆角墙体、三层描边光晕、四角装饰，仅在换色/换尺寸时重绘     |
+| 自定义绘制          | `scripts/food_view.gd`             | 六种食物/道具形状、双层光环、环绕卫星与地面投影            |
+| GPUParticles2D      | `scripts/ambient_fx.gd`            | 棋盘上方的浮尘与虚焦光斑，制造空气感与景深                 |
+| GPUParticles2D      | `scripts/game.gd` `_burst`         | 吃食物爆发、死亡爆散，颜色随道具变化                       |
+| PointLight2D        | `scripts/food_view.gd`             | 食物点光源照亮棋盘；食物自身设为 unshaded 防过曝           |
+| Camera2D            | `scripts/game.gd`                  | 按窗口与棋盘计算缩放、死亡抖动与进食推镜                   |
+| Tween               | `scripts/hud.gd` `scripts/game.gd` | 倒计时弹跳、分数飘字、死亡闪屏                             |
+| 运行时音频合成      | `scripts/synth.gd`                 | 用 GDScript 生成 PCM，音效与循环 BGM 零素材依赖            |
 
 ## 操作
 
@@ -57,7 +64,8 @@ godot --path .
 ```
 
 渲染器为 `gl_compatibility`，2D 光照、着色器与粒子都可在该渲染器下工作，
-同时兼容较老显卡与驱动。
+同时兼容较老显卡与驱动。后处理层只读取屏幕纹理，不依赖 Forward+ 的
+Glow/SSAO，因此桌面与 Web 端观感一致。
 
 ## 测试
 
@@ -94,20 +102,27 @@ godot --headless --path . --export-release "Web" build/web/index.html
 
 ```text
 .
-├── scenes/main.tscn      # 主场景：棋盘、食物、蛇、相机、HUD
+├── scenes/main.tscn      # 主场景：棋盘、浮尘、食物、蛇、后处理、相机、HUD
 ├── scripts/
 │   ├── board_logic.gd    # 纯逻辑：关卡布局、出生点、随机空格
-│   ├── board_view.gd     # 棋盘静态绘制
+│   ├── board_view.gd     # 着色器地面、圆角墙体、边框与四角装饰
 │   ├── portal_layer.gd   # 传送门动画
-│   ├── snake_view.gd     # Line2D 蛇身与蛇头
+│   ├── snake_view.gd     # Line2D 蛇身与着色器、蛇头
 │   ├── food_view.gd      # 食物绘制、灯光与粒子
+│   ├── ambient_fx.gd     # 浮尘与虚焦光斑
+│   ├── fx_layer.gd       # 屏幕后处理层（泛光/色差/调色/暗角）
 │   ├── hud.gd            # HUD、菜单、暂停、结算
 │   ├── game.gd           # 状态机、网格推进、输入、特效
 │   ├── palette.gd        # 三套配色
 │   ├── synth.gd          # PCM 合成
 │   ├── sfx.gd            # 音效播放器池（Autoload）
 │   └── save_data.gd      # 配置与最高分（Autoload）
-├── shaders/background.gdshader
+├── shaders/
+│   ├── background.gdshader
+│   ├── board2d.gdshader
+│   ├── snake_body.gdshader
+│   ├── snake_glow.gdshader
+│   └── postfx.gdshader
 ├── tests/smoke_test.tscn
 └── tools/subset_web_font.py   # 生成 Web 中文字体子集（CI 使用）
 ```
@@ -136,6 +151,15 @@ Web 端无法访问系统字体，CI 导出前会下载 Noto Sans SC，并按界
 `tools/subset_web_font.py` 可在本地复现这一步。
 
 ## 版本历史
+
+### 未发布（画面升级）
+
+- 新增屏幕后处理层：泛光、色差、暗角、电影调色、扫描线与胶片颗粒
+- 棋盘改为着色器地面：能量网格、交点闪烁、斜向扫光与内边框辉光
+- 蛇身接入自定义着色器：管状明暗、鳞纹、流动能量脉冲与边缘轮廓光
+- 蛇头补齐分层辉光、发光眼睛、吐信与护盾球壳
+- 食物新增双层光环、环绕卫星与地面投影；新增浮尘与虚焦光斑环境层
+- 吃食物镜头轻推、死亡降饱和，HUD 面板与标题加入主题色辉光
 
 ### v0.2.0（当前版本）
 
