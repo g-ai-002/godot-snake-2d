@@ -184,14 +184,20 @@ func _double(color: Color, r: float) -> void:
 	draw_circle(Vector2(r * 0.2, -r * 0.28), r * 0.16, color.lightened(0.6))
 
 
+static var _dot_cache: Texture2D
+
+
 static func _dot_texture() -> Texture2D:
+	if _dot_cache != null:
+		return _dot_cache
 	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
 	for y in 32:
 		for x in 32:
 			var offset := Vector2(x - 15.5, y - 15.5).length() / 16.0
 			var alpha := clampf(1.0 - offset, 0.0, 1.0)
 			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, alpha * alpha))
-	return ImageTexture.create_from_image(image)
+	_dot_cache = ImageTexture.create_from_image(image)
+	return _dot_cache
 
 
 static func _radial_texture() -> Texture2D:

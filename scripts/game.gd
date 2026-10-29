@@ -6,6 +6,9 @@ const CELL := 64.0
 const COUNTDOWN_TIME := 3.0
 const POWERUP_CHANCE := 0.28
 const BG_SHADER := preload("res://shaders/background.gdshader")
+const POPUP_POOL_SIZE := 8
+const BURST_POOL_SIZE := 6
+const BURST_AMOUNT := 40
 
 const EFFECT_DURATIONS := {
 	"speed_up": 6.0,
@@ -72,6 +75,12 @@ var _base_zoom := 1.0
 var _touch_origin := Vector2.ZERO
 var _bg_material: ShaderMaterial
 
+# 飘字与爆散粒子常驻复用，避免每次吃食物都新建节点/材质/贴图造成掉帧。
+var _popup_pool: Array[Label] = []
+var _popup_index := 0
+var _burst_pool: Array[GPUParticles2D] = []
+var _burst_index := 0
+
 @onready var board_view: BoardView = $Board
 @onready var snake_view: SnakeView = $Snake
 @onready var food_view: FoodView = $Food
@@ -84,6 +93,7 @@ func _ready() -> void:
 	rng.randomize()
 	_load_settings()
 	_build_background()
+	_warm_effects()
 
 	hud.start_pressed.connect(start_game)
 	hud.restart_pressed.connect(start_game)
@@ -132,6 +142,48 @@ func _build_background() -> void:
 	_bg_material.shader = BG_SHADER
 	rect.material = _bg_material
 	layer.add_child(rect)
+
+
+## 开局一次性建好飘字与爆散粒子池，运行时只改参数复用，避免吃食物时卡帧。
+func _warm_effects() -> void:
+	for i in POPUP_POOL_SIZE:
+		var label := Label.new()
+		label.add_theme_font_override("font", UiFont.get_font())
+		label.add_theme_font_size_override("font_size", int(CELL * 0.46))
+		label.add_theme_constant_override("outline_size", 6)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.custom_minimum_size = Vector2(CELL * 2.4, 0.0)
+		label.z_index = 30
+		label.visible = false
+		popups.add_child(label)
+		_popup_pool.append(label)
+
+	var dot := FoodView._dot_texture()
+	for i in BURST_POOL_SIZE:
+		var particles := GPUParticles2D.new()
+		particles.amount = BURST_AMOUNT
+		particles.lifetime = 0.65
+		particles.one_shot = true
+		particles.explosiveness = 1.0
+		particles.local_coords = false
+		particles.z_index = 12
+		particles.emitting = false
+		particles.texture = dot
+
+		var material := ParticleProcessMaterial.new()
+		material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+		material.emission_sphere_radius = CELL * 0.16
+		material.direction = Vector3(0.0, -1.0, 0.0)
+		material.spread = 180.0
+		material.initial_velocity_min = 20.0
+		material.initial_velocity_max = 45.0
+		material.gravity = Vector3(0.0, 70.0, 0.0)
+		material.scale_min = 0.1
+		material.scale_max = 0.28
+		particles.process_material = material
+
+		popups.add_child(particles)
+		_burst_pool.append(particles)
 
 
 func _on_viewport_resized() -> void:
@@ -340,7 +392,6 @@ func _tick() -> void:
 	var world := BoardLogic.cell_to_world(new_head, cols, rows, CELL)
 	_spawn_popup("+%d" % gain, world)
 	_burst(world, _food_color(), 22, 52.0)
-	shake = maxf(shake, 3.5)
 
 	if food_kind == "":
 		Sfx.play("eat")
@@ -573,54 +624,46 @@ func _update_hud(delta: float) -> void:
 
 
 func _spawn_popup(text: String, world: Vector2) -> void:
-	var label := Label.new()
+	var label := _popup_pool[_popup_index]
+	_popup_index = (_popup_index + 1) % _popup_pool.size()
+
+	var running: Variant = label.get_meta("fx_tween", null)
+	if running is Tween and running.is_valid():
+		running.kill()
+
 	label.text = text
-	label.add_theme_font_override("font", UiFont.get_font())
-	label.add_theme_font_size_override("font_size", int(CELL * 0.46))
 	label.add_theme_color_override("font_color", colors["accent"])
 	label.add_theme_color_override("font_outline_color", Color(colors["bg_bottom"], 0.95))
-	label.add_theme_constant_override("outline_size", 6)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.custom_minimum_size = Vector2(CELL * 2.4, 0.0)
 	label.position = world + Vector2(-CELL * 1.2, -CELL * 0.95)
-	label.z_index = 30
-	popups.add_child(label)
+	label.modulate.a = 1.0
+	label.visible = true
 
 	var tween := label.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(label, "position:y", label.position.y - CELL * 1.1, 0.8) \
 		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.tween_property(label, "modulate:a", 0.0, 0.75).set_delay(0.25)
-	tween.chain().tween_callback(label.queue_free)
+	tween.chain().tween_callback(_hide_popup.bind(label))
+	label.set_meta("fx_tween", tween)
+
+
+func _hide_popup(label: Label) -> void:
+	label.visible = false
 
 
 func _burst(world: Vector2, color: Color, amount: int, speed: float) -> void:
-	var particles := GPUParticles2D.new()
-	particles.position = world
-	particles.amount = amount
-	particles.lifetime = 0.65
-	particles.one_shot = true
-	particles.explosiveness = 1.0
-	particles.local_coords = false
-	particles.z_index = 12
-	particles.texture = FoodView._dot_texture()
+	var particles := _burst_pool[_burst_index]
+	_burst_index = (_burst_index + 1) % _burst_pool.size()
 
-	var material := ParticleProcessMaterial.new()
-	material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
-	material.emission_sphere_radius = CELL * 0.16
-	material.direction = Vector3(0.0, -1.0, 0.0)
-	material.spread = 180.0
+	particles.position = world
+	particles.amount = maxi(amount, 1)
+	particles.emitting = true
+	particles.restart()
+
+	var material := particles.process_material as ParticleProcessMaterial
 	material.initial_velocity_min = speed * 0.45
 	material.initial_velocity_max = speed
-	material.gravity = Vector3(0.0, 70.0, 0.0)
-	material.scale_min = 0.1
-	material.scale_max = 0.28
 	material.color = color
-	particles.process_material = material
-
-	popups.add_child(particles)
-	particles.emitting = true
-	get_tree().create_timer(1.2).timeout.connect(particles.queue_free)
 
 
 func _food_color() -> Color:
