@@ -23,6 +23,14 @@ func set_colors(new_colors: Dictionary) -> void:
 	queue_redraw()
 
 
+## 朝向变化必须重绘，否则 _draw 缓存的绘制指令会让眼睛停在旧方向。
+func set_direction(value: Vector2) -> void:
+	if direction == value:
+		return
+	direction = value
+	queue_redraw()
+
+
 func set_dead(value: bool) -> void:
 	if dead == value:
 		return

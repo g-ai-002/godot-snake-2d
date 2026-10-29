@@ -106,7 +106,7 @@ func update_snake(
 		points.append(from.lerp(to, progress))
 
 	head.position = points[0]
-	head.direction = Vector2(direction)
+	head.set_direction(Vector2(direction))
 	head.set_dead(is_dead)
 	head.set_shielded(shielded)
 
