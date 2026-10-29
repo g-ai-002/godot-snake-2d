@@ -12,6 +12,17 @@
 - 开局 3-2-1-GO 倒计时、暂停、结算、新纪录提示、最高分持久化
 - 键盘与触屏滑动操作，自适应窗口尺寸
 
+## 下载
+
+### v0.2.0（当前版本）
+
+- [Windows ZIP](https://github.com/g-ai-002/godot-snake-2d/releases/tag/v0.2.0)
+- [Web 在线试玩](https://g-ai-002.github.io/godot-snake-2d/v0.2.0/)
+
+### 历史版本
+
+- [v0.1.0](https://github.com/g-ai-002/godot-snake-2d/releases/tag/v0.1.0)
+
 ## 2D 引擎能力点
 
 | 能力                | 位置                               | 说明                                               |
@@ -58,7 +69,7 @@ godot --headless --path . res://tests/smoke_test.tscn
 ```
 
 首次运行（或删除 `.godot` 后）需先执行 `--import` 生成全局类缓存，CI 已包含这一步。
-测试场景为 `tests/smoke_test.tscn`，共 59 项断言，退出码非 0 表示失败。
+测试场景为 `tests/smoke_test.tscn`，共 68 项断言，退出码非 0 表示失败。
 
 ## 导出
 
@@ -123,6 +134,20 @@ Windows 微软雅黑、macOS 苹方、Linux 思源黑体/文泉驿，最后回�
 Web 端无法访问系统字体，CI 导出前会下载 Noto Sans SC，并按界面实际出现的字符
 裁剪成子集 `assets/fonts/web_cjk.otf`（通常几百 KB，不入库），再打进 Web 构建；
 `tools/subset_web_font.py` 可在本地复现这一步。
+
+## 版本历史
+
+### v0.2.0（当前版本）
+
+- 复用分数飘字与爆散粒子节点、缓存光点贴图，连续吃食物时不再频繁创建特效
+- 修正出生蛇身顺序，蛇头回到数组首位，避免开局首格自撞
+- 蛇头朝向变化时重绘，修复眼睛停留在旧方向
+- 飘字复用前校验 Tween 元数据，避免特效未结束时重复创建 Tween
+- 冒烟测试补充出生顺序与自撞用例，断言增至 68 项
+
+### v0.1.0
+
+- 首个正式版本：六种关卡、五种道具、三套配色、着色器棋盘、平滑蛇身与运行时音频合成
 
 ## 许可证
 
