@@ -7,7 +7,7 @@ config_version=5
 
 config/name="贪吃蛇 2D"
 config/description="基于 Godot 4.7.2 与 GDScript 的霓虹风 2D 贪吃蛇：着色器棋盘、粒子爆发、平滑蛇身、道具与关卡。"
-config/version="0.1.0"
+config/version="0.2.0"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
