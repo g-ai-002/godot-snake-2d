@@ -627,9 +627,10 @@ func _spawn_popup(text: String, world: Vector2) -> void:
 	var label := _popup_pool[_popup_index]
 	_popup_index = (_popup_index + 1) % _popup_pool.size()
 
-	var running: Variant = label.get_meta("fx_tween", null)
-	if running is Tween and running.is_valid():
-		running.kill()
+	if label.has_meta("fx_tween"):
+		var running: Variant = label.get_meta("fx_tween")
+		if running is Tween and running.is_valid():
+			running.kill()
 
 	label.text = text
 	label.add_theme_color_override("font_color", colors["accent"])
