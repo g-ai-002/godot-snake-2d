@@ -66,6 +66,7 @@ var countdown := 0.0
 var go_timer := 0.0
 var hud_accum := 0.0
 var shake := 0.0
+var punch := 0.0
 var dead := false
 
 var rng := RandomNumberGenerator.new()
@@ -87,6 +88,8 @@ var _burst_index := 0
 @onready var popups: Node2D = $Popups
 @onready var camera: Camera2D = $Camera
 @onready var hud: HudView = $UI/HUD
+@onready var fx: FxLayer = $Fx
+@onready var ambient: AmbientFx = $Ambient
 
 
 func _ready() -> void:
@@ -234,7 +237,9 @@ func start_game() -> void:
 	tick_accum = 0.0
 	go_timer = 0.0
 	shake = 0.0
+	punch = 0.0
 	camera.offset = Vector2.ZERO
+	fx.clear()
 
 	_setup_board()
 	_spawn_food()
@@ -258,7 +263,9 @@ func enter_menu() -> void:
 	effects.clear()
 	shield_charge = false
 	shake = 0.0
+	punch = 0.0
 	camera.offset = Vector2.ZERO
+	fx.clear()
 	SaveData.save_data()
 	_setup_board()
 	_spawn_food()
@@ -309,6 +316,7 @@ func _setup_board() -> void:
 	snake_view.configure(cols, rows, colors)
 	snake_view.update_snake(cells, cells, 1.0, direction, false, false)
 	food_view.configure(CELL, food_kind, colors)
+	ambient.configure(cols, rows, colors)
 	_fit_camera()
 
 
@@ -360,6 +368,7 @@ func _tick() -> void:
 			12,
 			34.0
 		)
+		fx.pulse(0.6)
 
 	if _blocked(new_head):
 		if shield_charge:
@@ -367,6 +376,7 @@ func _tick() -> void:
 			effects.erase("shield")
 			hud.set_effects(effects)
 			shake = 9.0
+			fx.pulse(0.9)
 			Sfx.play("shield")
 			return
 		_die()
@@ -392,6 +402,9 @@ func _tick() -> void:
 	var world := BoardLogic.cell_to_world(new_head, cols, rows, CELL)
 	_spawn_popup("+%d" % gain, world)
 	_burst(world, _food_color(), 22, 52.0)
+	punch = maxf(punch, 0.022)
+	fx.pulse(0.55)
+	board_view.set_energy(1.0)
 
 	if food_kind == "":
 		Sfx.play("eat")
@@ -426,6 +439,9 @@ func _die() -> void:
 	SaveData.save_data()
 	Sfx.play("death")
 	hud.flash(Color(colors["danger"], 0.55))
+	fx.flash(colors["danger"], 0.35)
+	fx.pulse(1.0)
+	fx.set_desaturate(0.6)
 	_burst(BoardLogic.cell_to_world(cells[0], cols, rows, CELL), colors["danger"], 36, 76.0)
 	snake_view.update_snake(previous_cells, cells, 1.0, direction, true, false)
 
@@ -592,6 +608,8 @@ func _apply_theme() -> void:
 		board_view.set_colors(colors)
 		snake_view.apply_colors(colors)
 		food_view.set_colors(colors)
+		ambient.configure(cols, rows, colors)
+		fx.configure(colors)
 
 
 # ---------------------------------------------------------------- 镜头与特效
@@ -612,6 +630,24 @@ func _update_camera(delta: float) -> void:
 	else:
 		shake = 0.0
 		camera.offset = Vector2.ZERO
+
+	# 吃到食物时镜头轻微前推，随后弹回，制造“命中”的手感
+	if punch > 0.0005:
+		punch = move_toward(punch, 0.0, delta * 0.16)
+		camera.zoom = Vector2(_base_zoom, _base_zoom) * (1.0 + punch)
+	else:
+		punch = 0.0
+		camera.zoom = Vector2(_base_zoom, _base_zoom)
+
+	var energy := 0.0
+	if effects.has("speed_up"):
+		energy = 1.0
+	elif effects.has("double"):
+		energy = 0.6
+	elif effects.has("magnet"):
+		energy = 0.4
+	snake_view.set_energy(energy)
+	board_view.set_energy(energy)
 
 
 func _update_hud(delta: float) -> void:

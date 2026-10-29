@@ -320,18 +320,28 @@ func _make_overlay() -> Array:
 func apply_theme(new_colors: Dictionary) -> void:
 	colors = new_colors
 	_style_panel(_top_panel, 0.88, 16)
-	_style_panel(_menu_panel, 0.96, 20)
-	_style_panel(_over_panel, 0.96, 20)
-	_style_panel(_pause_panel, 0.96, 20)
+	_style_panel(_menu_panel, 0.96, 20, true)
+	_style_panel(_over_panel, 0.96, 20, true)
+	_style_panel(_pause_panel, 0.96, 20, true)
 
 	_title.add_theme_color_override("font_color", colors["accent"])
+	_title.add_theme_color_override("font_shadow_color", Color(colors["accent"], 0.45))
+	_title.add_theme_constant_override("shadow_outline_size", 14)
 	_score_label.add_theme_color_override("font_color", colors["text"])
+	_score_label.add_theme_color_override("font_shadow_color", Color(colors["glow"], 0.35))
+	_score_label.add_theme_constant_override("shadow_outline_size", 8)
 	_over_score.add_theme_color_override("font_color", colors["accent"])
+	_over_score.add_theme_color_override("font_shadow_color", Color(colors["accent"], 0.4))
+	_over_score.add_theme_constant_override("shadow_outline_size", 12)
 	_over_title.add_theme_color_override("font_color", colors["danger"])
+	_over_title.add_theme_color_override("font_shadow_color", Color(colors["danger"], 0.4))
+	_over_title.add_theme_constant_override("shadow_outline_size", 10)
 	_over_badge.add_theme_color_override("font_color", colors["warning"])
 	_countdown_label.add_theme_color_override("font_color", colors["accent"])
 	_countdown_label.add_theme_color_override("font_outline_color", Color(colors["bg_bottom"], 0.9))
+	_countdown_label.add_theme_color_override("font_shadow_color", Color(colors["accent"], 0.6))
 	_countdown_label.add_theme_constant_override("outline_size", 10)
+	_countdown_label.add_theme_constant_override("shadow_outline_size", 26)
 
 	for label in _dim_labels:
 		label.add_theme_color_override("font_color", colors["text_dim"])
@@ -344,7 +354,7 @@ func apply_theme(new_colors: Dictionary) -> void:
 		set_effects(_last_effects)
 
 
-func _style_panel(panel: PanelContainer, alpha: float, radius: int) -> void:
+func _style_panel(panel: PanelContainer, alpha: float, radius: int, glow := false) -> void:
 	if panel == null:
 		return
 	var style := StyleBoxFlat.new()
@@ -352,8 +362,13 @@ func _style_panel(panel: PanelContainer, alpha: float, radius: int) -> void:
 	style.set_corner_radius_all(radius)
 	style.set_border_width_all(1)
 	style.border_color = Color(colors["panel_border"], 0.9)
-	style.shadow_color = Color(0, 0, 0, 0.45)
-	style.shadow_size = 16 if radius > 16 else 6
+	if glow:
+		style.border_color = Color(colors["accent"], 0.35)
+		style.shadow_color = Color(colors["accent"], 0.2)
+		style.shadow_size = 30
+	else:
+		style.shadow_color = Color(0, 0, 0, 0.45)
+		style.shadow_size = 6
 	style.content_margin_left = 18
 	style.content_margin_right = 18
 	style.content_margin_top = 12
