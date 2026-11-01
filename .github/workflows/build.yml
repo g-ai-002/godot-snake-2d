@@ -240,12 +240,12 @@ jobs:
             git push origin "$init_commit:refs/heads/gh-pages"
           fi
 
-          git fetch --no-tags --depth=1 origin gh-pages:refs/remotes/origin/gh-pages
+          git fetch --no-tags --depth=2 origin gh-pages:refs/remotes/origin/gh-pages
           git worktree add --detach pages refs/remotes/origin/gh-pages
           echo "📂 站点现有版本目录："
           find pages -maxdepth 1 -mindepth 1 -type d -name 'v*' -printf '  📁 %f\n' | sort -V || true
 
-      - name: 🗂️ 写入站点目录（保留历史版本）
+      - name: 🗂️ 写入站点目录
         shell: bash
         run: |
           set -euo pipefail
@@ -255,6 +255,41 @@ jobs:
           touch pages/.nojekyll
           echo "✅ 已写入 pages/${VERSION_PATH}"
           du -sh "pages/${VERSION_PATH}"
+
+      - name: 🧹 清理过期版本（只留最近 3 个 MINOR）
+        shell: bash
+        run: |
+          set -euo pipefail
+          keep_minors=3
+          mapfile -t versions_all < <(find pages -maxdepth 1 -mindepth 1 -type d -name 'v*' -printf '%f\n' | sort -V -r)
+          declare -A minor_taken=()
+          kept=()
+          for v in "${versions_all[@]}"; do
+            minor="${v#v}"
+            minor="${minor%.*}"
+            if [ -n "${minor_taken[$minor]:-}" ]; then
+              echo "🗑️ 同一 MINOR 的旧版本：$v"
+              continue
+            fi
+            if [ "${#minor_taken[@]}" -ge "$keep_minors" ]; then
+              echo "🗑️ 超出最近 ${keep_minors} 个 MINOR：$v"
+              continue
+            fi
+            minor_taken[$minor]="$v"
+            kept+=("$v")
+          done
+          for v in "${versions_all[@]}"; do
+            if [[ " ${kept[*]} " != *" $v "* ]]; then
+              rm -rf "pages/$v"
+            fi
+          done
+          # 本次刚发布的版本不能被清掉
+          if [[ "$VERSION_PATH" == v* ]] && [ ! -d "pages/$VERSION_PATH" ]; then
+            echo "❌ 本次发布的 $VERSION_PATH 被误删"
+            exit 1
+          fi
+          echo "📁 保留版本：${kept[*]:-无}"
+          du -sh pages
 
       - name: 🏠 生成版本索引页
         shell: bash
@@ -337,23 +372,28 @@ jobs:
           echo "--- 📄 versions.json ---"
           cat pages/versions.json
 
-      - name: 🚀 提交并推送站点
+      - name: 🚀 提交并推送站点（历史压缩为单次提交）
         shell: bash
         run: |
           set -euo pipefail
           cd pages
           git add -A
-          if git diff --cached --quiet; then
+          # 内容没变、且远端历史已经是单次提交时才跳过
+          if git diff --cached --quiet && [ "$(git rev-list --count HEAD)" -eq 1 ]; then
             echo "ℹ️ 站点内容无变化，跳过提交"
             exit 0
           fi
           if [ "$IS_RELEASE" = true ]; then
-            git commit -q -m "🌐 发布 Web 版本 ${VERSION_PATH}"
+            msg="🌐 发布 Web 版本 ${VERSION_PATH}"
           else
-            git commit -q -m "🧪 更新 Web 预览站点 ${VERSION_PATH}"
+            msg="🧪 更新 Web 预览站点 ${VERSION_PATH}"
           fi
-          git push origin HEAD:refs/heads/gh-pages
-          echo "✅ 已推送到 gh-pages"
+          # 每次发布都用当前索引生成一个无父提交并强推：gh-pages 永远只有一次提交，
+          # 不再累积历次构建产物，clone / fetch 会快很多。
+          tree=$(git write-tree)
+          commit=$(git commit-tree "$tree" -m "$msg")
+          git push --force origin "$commit:refs/heads/gh-pages"
+          echo "✅ 已推送到 gh-pages（单次提交，历史已压缩）"
           echo "🔗 https://${{ github.repository_owner }}.github.io/${{ env.APP_NAME }}/${VERSION_PATH}/"
 
   release:

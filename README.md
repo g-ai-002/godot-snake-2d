@@ -96,7 +96,8 @@ godot --headless --path . --export-release "Web" build/web/index.html
 `python tools/subset_web_font.py` 生成；否则 Web 页面中文会回退为方框。
 
 推送 `v*` tag 或手动触发工作流后，CI 会把 Web 产物发布到 `gh-pages` 分支
-（首次使用需在仓库 Settings → Pages 中选择该分支）。
+（首次使用需在仓库 Settings → Pages 中选择该分支）；站点只保留最近 3 个 MINOR
+版本（每个 MINOR 取最新一次发布），该分支每次发布都压缩成一次提交。
 
 ## 目录结构
 
